@@ -1,0 +1,12 @@
+{
+  "name": "anonity-gui",
+  "version": "1.0.0",
+  "description": "Anonymous Identity Authenticator — Electron desktop GUI",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^28.0.0"
+  }
+}
