@@ -4,40 +4,9 @@ A pseudonymous, reputation-based identity management system built on a custom bl
 
 ---
 
-## Architecture Overview
+## Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    identity_peer.py                     │
-│              (Node entry point / CLI)                   │
-└────────────┬─────────────────────────┬─────────────────┘
-             │                         │
-┌────────────▼──────────┐   ┌──────────▼──────────────────┐
-│   IdentityBlockchain  │   │      PeerChallengeManager    │
-│   identity/identity.py│   │  identity/peer_challenge.py  │
-│                       │   │                              │
-│  • IDENTITY_REGISTER  │   │  • Issue PoW challenges      │
-│  • REPUTATION_MINE    │   │  • Track pending/expiry      │
-│  • REPUTATION_IGNORE  │   │  • Report ignored challenges │
-│  • authenticate()     │   │  • Respond to own challenges │
-└────────────┬──────────┘   └──────────────────────────────┘
-             │
-┌────────────▼──────────┐   ┌──────────────────────────────┐
-│   ReputationRecord    │   │          PoW Engine           │
-│  identity/reputation  │   │      identity/pow.py          │
-│                       │   │                              │
-│  • balance            │   │  Registration: 20-bit target  │
-│  • apply_mining_reward│   │  Reputation:   14-bit target  │
-│  • apply_soft_decay   │   │  verify_registration()        │
-│  • apply_ignore_penalty│  │  issue_reputation_challenge() │
-└───────────────────────┘   └──────────────────────────────┘
-             │
-┌────────────▼──────────────────────────────────────────┐
-│              Blockchain (request-chain base)           │
-│              blockchain/blockchain.py                  │
-│         blockchain/network.py  (P2P layer)             │
-└───────────────────────────────────────────────────────┘
-```
+The system is layered: `identity_peer.py` serves as the node entry point, wiring together an `IdentityBlockchain` (which extends the request-chain base with `IDENTITY_REGISTER`, `REPUTATION_MINE`, and `REPUTATION_IGNORE` transaction types), a `PeerChallengeManager` (which periodically selects peers to challenge and tracks pending challenges to expiry), a `ReputationRecord` store (per-identity balance and lifecycle state held in `identity/reputation.py`), and a SHA-256 PoW engine (`identity/pow.py`) used for both registration proofs and reputation challenges. The P2P layer from request-chain is reused unchanged; two new message types — `REP_CHALLENGE` and `REP_SOLUTION` — handle reputation flows on top of the existing block and transaction gossip.
 
 ---
 
@@ -220,33 +189,65 @@ requestchain-identity/
 
 ---
 
-## Quick Start
+## Running the Peer
 
-### Single node
+### Prerequisites
 
 ```bash
 pip install -r requirements.txt
-python identity_peer.py 6000
 ```
 
-1. Select **1** to register your identity (PoW will solve automatically)
-2. Select **4** to view your identity and balance
-3. Select **2** to authenticate any public key
+Node.js (v18 or newer) is required only for the Electron GUI.
 
-### Two-node network
+### CLI peer
+
+The terminal interface is the simplest way to get started.
+
+```bash
+# Start on the default port (6000)
+python anonity/identity_peer.py
+
+# Or pick a specific port
+python anonity/identity_peer.py 6001
+```
+
+**First-time setup**
+
+1. On first launch your EC keypair is generated and saved to `~/.databox/identity/my_key.pkl`. It persists across restarts — the same keypair is loaded automatically each time.
+2. Choose **option 1 — Register Identity**. The node solves a 20-bit proof-of-work automatically (takes 1–5 seconds) and mines a block to confirm the registration. Your starting balance is 100.0.
+3. Your node is now live. It will automatically issue and respond to reputation challenges every two minutes. Use **option 4** to watch your balance grow.
+
+### Electron desktop GUI
+
+The graphical interface controls the peer through a local REST API backend (`anonity/identity_api.py`). Electron spawns that server automatically — no manual startup needed.
+
+```bash
+cd electron
+npm install
+npm start
+```
+
+To connect two nodes, start a second instance on a different port:
+
+```bash
+npm start -- 6001
+```
+
+Then use the **Connect to Peer** button and enter `localhost:6000`.
+
+### Two-node CLI network
 
 ```bash
 # Terminal 1
-python identity_peer.py 6000
+python anonity/identity_peer.py 6000
 
 # Terminal 2
-python identity_peer.py 6001
-
-# In node 6001: select 5, connect to localhost:6000
-# In node 6001: select 7 to sync chain
+python anonity/identity_peer.py 6001
+# Select 5 → connect to localhost:6000
+# Select 7 → sync chain
 ```
 
-Both nodes will now automatically issue and respond to reputation challenges every 2 minutes. Balance changes will propagate via REPUTATION_MINE and REPUTATION_IGNORE transactions mined into blocks.
+Both nodes will automatically issue and respond to reputation challenges every 2 minutes. Balance changes propagate via `REPUTATION_MINE` and `REPUTATION_IGNORE` transactions mined into blocks.
 
 ---
 
@@ -298,7 +299,6 @@ Flat random would be unfair to new identities — they'd be challenged at the sa
 ## Next Steps
 
 - **Blind issuance** for multi-key users who need unlinkable identities
-- **Web UI** extending the existing Flask interface in `ui/web/`
 - **Honeypot challenges** (node injects synthetic challenges to detect scripted responders)
 - **Temporal maturation** (new identities have limited privileges for N blocks)
 - **Key rotation** (allow an identity to transfer its balance to a new key with PoW proof)

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; connect-src http://127.0.0.1:*; script-src 'self'; style-src 'self'">
+  <title>Anonymous Identity Authenticator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ── Loading overlay ──────────────────────────────────────────────── -->
+<div id="loading">
+  <div class="spinner"></div>
+  <div id="loading-msg">Connecting to peer…</div>
+</div>
+
+<!-- ── Toast ────────────────────────────────────────────────────────── -->
+<div id="toast"></div>
+
+<!-- ── Modal overlay ────────────────────────────────────────────────── -->
+<div id="overlay">
+  <div id="modal">
+    <div id="modal-title"></div>
+    <div id="modal-body"></div>
+    <div id="modal-footer">
+      <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
+      <button class="btn btn-primary"   id="modal-confirm">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── App shell ─────────────────────────────────────────────────────── -->
+<div id="app">
+
+  <!-- Header -->
+  <header id="header">
+    <div id="header-title">Anonymous Identity Authenticator</div>
+    <div id="header-stats">
+      <div class="stat">
+        <span class="stat-label">ID</span>
+        <span class="stat-value" id="stat-pubkey">—</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Balance</span>
+        <span class="stat-value" id="stat-balance">—</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Peers</span>
+        <span class="stat-value" id="stat-peers">—</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Blocks</span>
+        <span class="stat-value" id="stat-blocks">—</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Mempool</span>
+        <span class="stat-value" id="stat-mempool">—</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Integrity</span>
+        <span class="stat-value" id="stat-integrity">—</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Content: sidebar + identity table -->
+  <div id="content">
+    <nav id="sidebar">
+      <div class="sidebar-label">Identity</div>
+      <button class="action-btn" id="btn-register">Register Identity</button>
+      <button class="action-btn" id="btn-authenticate">Authenticate Key</button>
+      <button class="action-btn" id="btn-my-identity">My Identity</button>
+
+      <div class="sidebar-label" style="margin-top:8px">Network</div>
+      <button class="action-btn" id="btn-connect">Connect to Peer</button>
+      <button class="action-btn" id="btn-peers">List Peers</button>
+      <button class="action-btn" id="btn-sync">Sync Chain</button>
+
+      <div class="sidebar-label" style="margin-top:8px">Chain</div>
+      <button class="action-btn" id="btn-mine">Mine Pending</button>
+      <button class="action-btn" id="btn-status">Chain Status</button>
+      <button class="action-btn" id="btn-challenge">Issue Challenge</button>
+    </nav>
+
+    <main id="main">
+      <div class="section-label">Registered Identities</div>
+      <div id="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Public Key</th>
+              <th>Balance</th>
+              <th>Solved</th>
+              <th>Ignored</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="identity-tbody">
+            <tr><td class="empty-cell" colspan="5">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <!-- Activity log -->
+  <div id="log-panel">
+    <div id="log-header">Activity Log</div>
+    <div id="log-scroll"></div>
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
