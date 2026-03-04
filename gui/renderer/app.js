@@ -3,9 +3,10 @@
 // ── Bootstrap ──────────────────────────────────────────────────────────────
 // window.anonity is exposed by preload.js via contextBridge.
 
-let API = ''          // set after we get the port from main process
-let ownPubkey = ''    // filled once /api/status returns our pubkey
-let logCursor = 0     // position in the server's log buffer
+let API = ''                  // set after we get the port from main process
+let ownPubkey = ''            // filled once /api/status returns our pubkey
+let logCursor = 0             // position in the server's log buffer
+let incomingChallengeCursor = 0  // position in the server's challenge-event buffer
 
 async function boot () {
   const port = await window.anonity.getApiPort()
@@ -133,6 +134,7 @@ async function refreshIdentities () {
 
 function startLogPolling () {
   pollLogs()
+  pollIncomingChallenges()
 }
 
 async function pollLogs () {
@@ -162,6 +164,48 @@ async function pollLogs () {
 function escHtml (s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
 }
+
+// ── Incoming-challenge banner ───────────────────────────────────────────────
+
+let _challengeBarTimer = null
+
+function showChallengeBar (msg, state = 'solving') {
+  const bar  = document.getElementById('challenge-bar')
+  const icon = document.getElementById('challenge-bar-icon')
+  bar.className = state          // 'solving' | 'solved'
+  icon.textContent = state === 'solved' ? '✓' : '⚡'
+  document.getElementById('challenge-bar-msg').textContent = msg
+  clearTimeout(_challengeBarTimer)
+  if (state === 'solved') {
+    _challengeBarTimer = setTimeout(hideChallengeBar, 6000)
+  }
+}
+
+function hideChallengeBar () {
+  document.getElementById('challenge-bar').classList.add('hidden')
+}
+
+async function pollIncomingChallenges () {
+  try {
+    const data = await fetchJSON(`/api/incoming-challenges?since=${incomingChallengeCursor}`)
+    if (data.events && data.events.length > 0) {
+      for (const ev of data.events) {
+        if (ev.kind === 'received') {
+          showChallengeBar(
+            `Incoming challenge from ${abbrev(ev.issuer_pubkey, 20)} — solving proof-of-work automatically…`,
+            'solving',
+          )
+        } else if (ev.kind === 'solved') {
+          showChallengeBar('Challenge solved! Reputation transaction broadcast to network.', 'solved')
+        }
+      }
+      incomingChallengeCursor = data.next
+    }
+  } catch (_) {}
+  setTimeout(pollIncomingChallenges, 1000)
+}
+
+document.getElementById('challenge-bar-dismiss').addEventListener('click', hideChallengeBar)
 
 // ── Modal helpers ──────────────────────────────────────────────────────────
 
@@ -379,8 +423,18 @@ document.getElementById('btn-challenge').addEventListener('click', async () => {
       if (!selectedPubkey) { toast('No identity selected'); return }
       try {
         const res = await postJSON('/api/challenge', { target_pubkey: selectedPubkey })
-        if (res.ok) toast('Challenge issued')
-        else toast(res.error || 'Challenge failed')
+        if (res.ok) {
+          infoModal(
+            'Challenge Issued',
+            `Challenge sent to:\n${abbrev(selectedPubkey, 48)}\n\n` +
+            `The target must solve a proof-of-work puzzle within 5 minutes.\n\n` +
+            `• If they respond in time → their balance increases by 10\n` +
+            `• If they do not respond → their balance is penalised by 15\n\n` +
+            `Watch the Activity Log for updates.`,
+          )
+        } else {
+          toast(res.error || 'Challenge failed')
+        }
       } catch (e) { toast('Error: ' + e.message) }
     },
   })
