@@ -448,6 +448,24 @@ def api_incoming_challenges():
     return jsonify({'events': entries, 'next': total})
 
 
+# ── Mempool contents ──────────────────────────────────────────────────────────
+
+@app.route('/api/mempool')
+def api_mempool():
+    chain = state['chain']
+    if chain is None:
+        return jsonify([])
+    return jsonify([
+        {
+            'uid':       tx.uid,
+            'type':      int(tx.tx_type),
+            'requester': serialize_pubkey(tx.requester),
+            'timestamp': tx.timestamp,
+        }
+        for tx in chain.mempool
+    ])
+
+
 # ── Issued (pending) challenges ───────────────────────────────────────────────
 
 @app.route('/api/issued-challenges')
@@ -704,6 +722,11 @@ def _wire_network(p2p, chain, priv_key, pubkey_hex, challenge_manager):
 
     def on_ignore_to_report(target_pubkey: str, challenge):
         log(f"Challenge expired for {target_pubkey[:16]}… — submitting ignore penalty")
+        _add_challenge_event({
+            'kind':          'expired',
+            'target_pubkey': target_pubkey,
+            'status':        'expired',
+        })
         try:
             ignore_tx = make_reputation_ignore_tx(priv_key, target_pubkey, challenge)
             if chain.record_ignore(ignore_tx):

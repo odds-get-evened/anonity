@@ -53,9 +53,13 @@
         <span class="stat-label">Blocks</span>
         <span class="stat-value" id="stat-blocks">—</span>
       </div>
-      <div class="stat">
+      <div class="stat stat-clickable" id="mempool-stat" title="Click to inspect mempool">
         <span class="stat-label">Mempool</span>
         <span class="stat-value" id="stat-mempool">—</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Auth</span>
+        <span class="stat-value" id="stat-auth">—</span>
       </div>
       <div class="stat">
         <span class="stat-label">Integrity</span>
@@ -108,10 +112,26 @@
           </tbody>
         </table>
       </div>
+
+      <div class="section-label" style="margin-top:10px">Pending Challenges Issued</div>
+      <div id="challenges-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Target</th>
+              <th>Issued</th>
+              <th>Expires</th>
+            </tr>
+          </thead>
+          <tbody id="challenges-tbody">
+            <tr><td class="empty-cell" colspan="3">No pending challenges</td></tr>
+          </tbody>
+        </table>
+      </div>
     </main>
   </div>
 
-  <!-- Activity log -->
+  <!-- Activity log (explicit grid placement keeps it anchored when challenge bar appears) -->
   <div id="log-panel">
     <div id="log-header">Activity Log</div>
     <div id="log-scroll"></div>
