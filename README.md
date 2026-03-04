@@ -10,7 +10,7 @@ A pseudonymous, reputation-based identity management system built on a custom bl
 
 - **Python 3.10+**
 - **[request-chain](https://github.com/odds-get-evened/requestchain)** — the base blockchain package. Clone it and make sure its root is on your `PYTHONPATH` (the `blockchain/` package inside it must be importable).
-- **Node.js v18+** — only required for the Electron desktop GUI.
+- **Node.js v18+** — only required for the desktop GUI.
 
 ```bash
 # 1. Install Python dependencies
@@ -33,10 +33,10 @@ At the menu:
 2. **Select 4** — Show My Identity & Reputation to confirm registration and view your balance.
 3. The node now runs in the background, automatically issuing and responding to reputation challenges every 2 minutes. No further action is needed to stay authenticated.
 
-### Quick start — Electron GUI (single node)
+### Quick start — GUI (single node)
 
 ```bash
-cd electron
+cd gui
 npm install
 npm start
 ```
@@ -60,14 +60,14 @@ In Terminal 2:
 
 Both nodes will automatically exchange reputation challenges every 2 minutes. Balance changes propagate via `REPUTATION_MINE` and `REPUTATION_IGNORE` transactions.
 
-### Quick start — two-node network (Electron GUI)
+### Quick start — two-node network (GUI)
 
 ```bash
 # Window 1 — node A
-cd electron && npm start
+cd gui && npm start
 
 # Window 2 — node B on a different port
-cd electron && npm start -- 6001
+cd gui && npm start -- 6001
 ```
 
 In window 2, use the **Connect to Peer** button and enter `localhost:6000`.
@@ -243,14 +243,14 @@ anonity/                          # repository root
 ├── anonity/                      # Python package
 │   ├── __init__.py
 │   ├── identity_peer.py          # CLI node entry point
-│   ├── identity_api.py           # Flask REST API backend (used by Electron GUI)
+│   ├── identity_api.py           # Flask REST API backend (used by GUI)
 │   └── identity/
 │       ├── __init__.py
 │       ├── identity.py           # IdentityBlockchain (extends base)
 │       ├── pow.py                # PoW engine (registration + reputation)
 │       ├── reputation.py         # ReputationRecord + ReputationEngine
 │       └── peer_challenge.py     # PeerChallengeManager
-├── electron/                     # Electron desktop GUI
+├── gui/                          # Electron desktop GUI
 │   ├── main.js                   # Electron main process (spawns Python API)
 │   ├── preload.js                # Context bridge for renderer
 │   ├── package.json
@@ -278,7 +278,7 @@ pip install -r requirements.txt
 export PYTHONPATH="/path/to/requestchain:$PYTHONPATH"
 ```
 
-Node.js (v18 or newer) is required only for the Electron GUI.
+Node.js (v18 or newer) is required only for the GUI.
 
 ### CLI peer
 
@@ -300,7 +300,7 @@ python anonity/identity_peer.py 6001
 
 ### Flask API server (standalone)
 
-`anonity/identity_api.py` exposes the same node functionality over HTTP. The Electron GUI uses this automatically, but you can also run it directly for scripting or integration:
+`anonity/identity_api.py` exposes the same node functionality over HTTP. The GUI uses this automatically, but you can also run it directly for scripting or integration:
 
 ```bash
 # p2p_port defaults to 6000, api_port defaults to 5001
@@ -326,17 +326,17 @@ Available endpoints:
 | `POST` | `/api/challenge` | Issue a reputation challenge `{ target_pubkey }` |
 | `GET` | `/api/logs?since=N` | Return log entries from index N onwards |
 
-### Electron desktop GUI
+### Desktop GUI
 
-The graphical interface controls the peer through `anonity/identity_api.py`. Electron spawns that server automatically — no manual startup needed.
+The graphical interface controls the peer through `anonity/identity_api.py`. The GUI spawns that server automatically — no manual startup needed.
 
 ```bash
-cd electron
+cd gui
 npm install
 npm start
 ```
 
-The Electron app assigns the API port as `P2P_PORT + 1000` (e.g., P2P port 6000 → API on port 7000).
+The GUI app assigns the API port as `P2P_PORT + 1000` (e.g., P2P port 6000 → API on port 7000).
 
 To start a second GUI node on a different port:
 
