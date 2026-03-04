@@ -239,7 +239,10 @@ def api_register():
 
     if chain.authenticate(pubkey_hex):
         record = chain.get_identity(pubkey_hex)
-        return jsonify({'already_registered': True, 'balance': record.balance})
+        # Only block if the identity has non-default reputation; at exactly
+        # DEFAULT_BALANCE (no reputation earned/lost) allow a fresh registration.
+        if record and record.balance != DEFAULT_BALANCE:
+            return jsonify({'already_registered': True, 'balance': record.balance})
 
     def _do_register():
         try:
@@ -558,6 +561,13 @@ def _wire_network(p2p, chain, priv_key, pubkey_hex, challenge_manager):
                             IdentityTxTypes.REPUTATION_IGNORE,
                         ):
                             chain._apply_identity_tx(tx)
+                # Remove mempool entries that are now confirmed in the adopted chain
+                confirmed_uids = {
+                    tx.uid
+                    for block in chain.chain
+                    for tx in block.transactions
+                }
+                chain.mempool = [tx for tx in chain.mempool if tx.uid not in confirmed_uids]
                 chain.snapshot_identity(SNAP_PATH)
             else:
                 log("Kept current chain (already longest or peer chain invalid)")
@@ -651,6 +661,8 @@ def _wire_network(p2p, chain, priv_key, pubkey_hex, challenge_manager):
 
     def on_challenge_to_issue(cm: ChallengeMessage):
         log(f"Issuing challenge to {cm.target_pubkey[:16]}…")
+        # Store locally so we can validate the solution when it arrives
+        chain.pending_challenges[cm.target_pubkey] = cm.to_challenge()
         p2p.broadcast(Message(RepMessageType.REP_CHALLENGE, cm.to_dict()))
 
     def on_ignore_to_report(target_pubkey: str, challenge):
