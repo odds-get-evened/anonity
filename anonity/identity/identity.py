@@ -202,10 +202,12 @@ class IdentityBlockchain(Blockchain):
         if not verify_registration(pubkey_hex, seed, nonce):
             return False
 
-        # Check for duplicate (already registered and authenticated)
+        # Block re-registration only when the identity has built up (or lost)
+        # reputation away from the default — at exactly DEFAULT_BALANCE the PoW
+        # cost already paid is sufficient to allow a fresh start.
         existing = self.identities.get(pubkey_hex)
-        if existing and existing.is_authenticated:
-            return False  # Already registered, don't let them re-register for free
+        if existing and existing.is_authenticated and existing.balance != DEFAULT_BALANCE:
+            return False
 
         # Add to mempool
         self.mempool.append(tx)
