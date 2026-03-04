@@ -72,17 +72,20 @@ class RepMessageType(StrEnum):
 # ---------------------------------------------------------------------------
 
 def save_keypair(priv_key: ec.EllipticCurvePrivateKey, p: Path):
-    import pickle
+    from cryptography.hazmat.primitives.serialization import (
+        Encoding, PrivateFormat, NoEncryption,
+    )
+    pem = priv_key.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption())
     with open(p, 'wb') as fh:
-        pickle.dump(priv_key, fh)
+        fh.write(pem)
 
 
 def load_keypair(p: Path) -> ec.EllipticCurvePrivateKey | None:
-    import pickle
+    from cryptography.hazmat.primitives.serialization import load_pem_private_key
     if p.exists():
         with open(p, 'rb') as fh:
             try:
-                return pickle.load(fh)
+                return load_pem_private_key(fh.read(), password=None)
             except Exception:
                 pass
     return None
