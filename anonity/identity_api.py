@@ -608,6 +608,10 @@ def _wire_network(p2p, chain, priv_key, pubkey_hex, challenge_manager):
             try:
                 cm       = ChallengeMessage.from_dict(msg.payload)
                 incoming = challenge_manager.receive_challenge(cm)
+                # Set pending_challenges BEFORE starting the solver thread to
+                # avoid a race where submit_reputation_solution runs before the
+                # challenge is registered and rejects the tx as invalid.
+                chain.pending_challenges[cm.target_pubkey] = cm.to_challenge()
                 if incoming is not None:
                     _add_challenge_event({
                         'kind':           'received',
@@ -632,7 +636,6 @@ def _wire_network(p2p, chain, priv_key, pubkey_hex, challenge_manager):
                         target=_respond_and_track,
                         daemon=True,
                     ).start()
-                chain.pending_challenges[cm.target_pubkey] = cm.to_challenge()
             except Exception as e:
                 log(f"REP_CHALLENGE error: {e}")
 
@@ -664,6 +667,40 @@ def _wire_network(p2p, chain, priv_key, pubkey_hex, challenge_manager):
         # Store locally so we can validate the solution when it arrives
         chain.pending_challenges[cm.target_pubkey] = cm.to_challenge()
         p2p.broadcast(Message(RepMessageType.REP_CHALLENGE, cm.to_dict()))
+
+        # If the target is this node, handle the challenge locally as well.
+        # This is essential in single-node setups where P2P broadcast would
+        # go nowhere: the node challenges itself, auto-solves the PoW, and
+        # the resulting REPUTATION_MINE tx lands in the mempool ready to mine.
+        if cm.target_pubkey == pubkey_hex:
+            incoming = challenge_manager.receive_challenge(cm)
+            if incoming is not None:
+                # Set the pending challenge BEFORE starting the solver thread
+                chain.pending_challenges[cm.target_pubkey] = cm.to_challenge()
+                _add_challenge_event({
+                    'kind':          'received',
+                    'issuer_pubkey': cm.issuer_pubkey,
+                    'target_pubkey': cm.target_pubkey,
+                    'issued_at':     cm.issued_at,
+                    'expires_at':    cm.issued_at + cm.expires_in,
+                    'status':        'solving',
+                })
+
+                def _self_respond_and_track(_cm=cm):
+                    _respond_to_challenge(priv_key, chain, p2p, _cm)
+                    _add_challenge_event({
+                        'kind':          'solved',
+                        'issuer_pubkey': _cm.issuer_pubkey,
+                        'target_pubkey': _cm.target_pubkey,
+                        'issued_at':     _cm.issued_at,
+                        'status':        'solved',
+                    })
+                    log("Self-challenge solved — REPUTATION_MINE tx in mempool. Click 'Mine Pending' to confirm.")
+
+                threading.Thread(
+                    target=_self_respond_and_track,
+                    daemon=True,
+                ).start()
 
     def on_ignore_to_report(target_pubkey: str, challenge):
         log(f"Challenge expired for {target_pubkey[:16]}… — submitting ignore penalty")

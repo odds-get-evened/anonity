@@ -397,7 +397,7 @@ document.getElementById('btn-challenge').addEventListener('click', async () => {
     records = await fetchJSON('/api/identities')
   } catch (e) { toast('Error: ' + e.message); return }
 
-  const candidates = records.filter(r => r.authenticated && r.pubkey !== ownPubkey)
+  const candidates = records.filter(r => r.authenticated)
   if (!candidates.length) {
     infoModal('Issue Challenge', 'No other authenticated identities available to challenge')
     return
@@ -406,11 +406,12 @@ document.getElementById('btn-challenge').addEventListener('click', async () => {
   // Build a list-picker modal
   const listHtml = `
     <div class="modal-list" id="challenge-list">
-      ${candidates.map((r, i) =>
-        `<div class="modal-list-item" data-i="${i}" data-pubkey="${escHtml(r.pubkey)}">
-          ${abbrev(r.pubkey, 38)} &nbsp;<span style="color:var(--muted)">bal=${r.balance.toFixed(1)}</span>
+      ${candidates.map((r, i) => {
+        const isSelf = r.pubkey === ownPubkey
+        return `<div class="modal-list-item" data-i="${i}" data-pubkey="${escHtml(r.pubkey)}">
+          ${abbrev(r.pubkey, 38)} &nbsp;<span style="color:var(--muted)">bal=${r.balance.toFixed(1)}</span>${isSelf ? ' <span style="color:var(--accent);font-size:10px">(self)</span>' : ''}
         </div>`
-      ).join('')}
+      }).join('')}
     </div>`
 
   let selectedPubkey = null
