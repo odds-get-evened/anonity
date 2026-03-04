@@ -21,7 +21,10 @@ function startPythonServer () {
   const scriptPath = path.join(__dirname, '..', 'anonity', 'identity_api.py')
   const cwd        = path.join(__dirname, '..', 'anonity')
 
-  pythonProcess = spawn(py, [scriptPath, String(P2P_PORT), String(API_PORT)], { cwd })
+  pythonProcess = spawn(py, [scriptPath, String(P2P_PORT), String(API_PORT)], {
+    cwd,
+    env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+  })
 
   pythonProcess.stdout.on('data', d => process.stdout.write('[py] ' + d))
   pythonProcess.stderr.on('data', d => process.stderr.write('[py] ' + d))
