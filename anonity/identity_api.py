@@ -106,6 +106,19 @@ def log(msg: str):
 
 
 # ---------------------------------------------------------------------------
+# Incoming challenge event buffer  (polled by /api/incoming-challenges)
+# ---------------------------------------------------------------------------
+
+_challenge_events: list[dict] = []
+_challenge_events_lock = threading.Lock()
+
+
+def _add_challenge_event(event: dict):
+    with _challenge_events_lock:
+        _challenge_events.append(event)
+
+
+# ---------------------------------------------------------------------------
 # Shared peer state
 # ---------------------------------------------------------------------------
 
@@ -415,6 +428,45 @@ def api_logs():
     return jsonify({'entries': entries, 'next': total})
 
 
+# ── Incoming challenge events ─────────────────────────────────────────────────
+
+@app.route('/api/incoming-challenges')
+def api_incoming_challenges():
+    """Return incoming-challenge events from index `since` onwards."""
+    try:
+        since = int(request.args.get('since', 0))
+    except ValueError:
+        since = 0
+
+    with _challenge_events_lock:
+        entries = _challenge_events[since:]
+        total   = len(_challenge_events)
+
+    return jsonify({'events': entries, 'next': total})
+
+
+# ── Issued (pending) challenges ───────────────────────────────────────────────
+
+@app.route('/api/issued-challenges')
+def api_issued_challenges():
+    """Return challenges this node has issued that are still pending."""
+    challenge_manager = state['challenge_manager']
+    if challenge_manager is None:
+        return jsonify([])
+
+    with challenge_manager._lock:
+        result = [
+            {
+                'target_pubkey': ic.target_pubkey,
+                'issued_at':     ic.issued_at,
+                'expires_at':    ic.issued_at + ic.challenge.expires_in,
+                'resolved':      ic.resolved,
+            }
+            for ic in challenge_manager.issued.values()
+        ]
+    return jsonify(result)
+
+
 # ---------------------------------------------------------------------------
 # Challenge response (our identity being challenged)
 # ---------------------------------------------------------------------------
@@ -547,9 +599,27 @@ def _wire_network(p2p, chain, priv_key, pubkey_hex, challenge_manager):
                 cm       = ChallengeMessage.from_dict(msg.payload)
                 incoming = challenge_manager.receive_challenge(cm)
                 if incoming is not None:
+                    _add_challenge_event({
+                        'kind':           'received',
+                        'issuer_pubkey':  cm.issuer_pubkey,
+                        'target_pubkey':  cm.target_pubkey,
+                        'issued_at':      cm.issued_at,
+                        'expires_at':     cm.issued_at + cm.expires_in,
+                        'status':         'solving',
+                    })
+
+                    def _respond_and_track(_cm=cm):
+                        _respond_to_challenge(priv_key, chain, p2p, _cm)
+                        _add_challenge_event({
+                            'kind':          'solved',
+                            'issuer_pubkey': _cm.issuer_pubkey,
+                            'target_pubkey': _cm.target_pubkey,
+                            'issued_at':     _cm.issued_at,
+                            'status':        'solved',
+                        })
+
                     threading.Thread(
-                        target=_respond_to_challenge,
-                        args=(priv_key, chain, p2p, cm),
+                        target=_respond_and_track,
                         daemon=True,
                     ).start()
                 chain.pending_challenges[cm.target_pubkey] = cm.to_challenge()
