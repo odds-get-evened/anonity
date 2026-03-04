@@ -1,3 +1,3 @@
 cryptography>=3.0
 flask>=2.0
-git+https://github.com/odds-get-evened/requestchain.git
+git+https://github.com/odds-get-evened/request-chain.git

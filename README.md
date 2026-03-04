@@ -258,7 +258,7 @@ anonity/                          # repository root
 └── README.md
 ```
 
-> **Note:** The `blockchain/` base package (P2P network, block/transaction primitives) comes from the [request-chain](https://github.com/odds-get-evened/requestchain) repository, which is installed automatically via `requirements.txt`.
+> **Note:** The `blockchain/` base package (P2P network, block/transaction primitives) comes from the [request-chain](https://github.com/odds-get-evened/request-chain) repository, which is installed automatically via `requirements.txt`.
 
 ---
 
