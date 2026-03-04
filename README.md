@@ -9,15 +9,11 @@ A pseudonymous, reputation-based identity management system built on a custom bl
 ### Prerequisites
 
 - **Python 3.10+**
-- **[request-chain](https://github.com/odds-get-evened/requestchain)** — the base blockchain package. Clone it and make sure its root is on your `PYTHONPATH` (the `blockchain/` package inside it must be importable).
 - **Node.js v18+** — only required for the desktop GUI.
 
 ```bash
-# 1. Install Python dependencies
+# Install all Python dependencies (including request-chain)
 pip install -r requirements.txt
-
-# 2. Make request-chain importable (adjust path to where you cloned it)
-export PYTHONPATH="/path/to/requestchain:$PYTHONPATH"
 ```
 
 ### Quick start — CLI (single node)
@@ -262,7 +258,7 @@ anonity/                          # repository root
 └── README.md
 ```
 
-> **Note:** The `blockchain/` base package (P2P network, block/transaction primitives) lives in the separate [request-chain](https://github.com/odds-get-evened/requestchain) repository. It must be cloned alongside this project and added to `PYTHONPATH` before running.
+> **Note:** The `blockchain/` base package (P2P network, block/transaction primitives) comes from the [request-chain](https://github.com/odds-get-evened/request-chain) repository, which is installed automatically via `requirements.txt`.
 
 ---
 
@@ -271,11 +267,8 @@ anonity/                          # repository root
 ### Prerequisites
 
 ```bash
-# Python dependencies
+# Install all Python dependencies (including request-chain)
 pip install -r requirements.txt
-
-# The request-chain base package must be on PYTHONPATH
-export PYTHONPATH="/path/to/requestchain:$PYTHONPATH"
 ```
 
 Node.js (v18 or newer) is required only for the GUI.
