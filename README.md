@@ -4,9 +4,79 @@ A pseudonymous, reputation-based identity management system built on a custom bl
 
 ---
 
+## Getting Started
+
+### Prerequisites
+
+- **Python 3.10+**
+- **[request-chain](https://github.com/odds-get-evened/requestchain)** — the base blockchain package. Clone it and make sure its root is on your `PYTHONPATH` (the `blockchain/` package inside it must be importable).
+- **Node.js v18+** — only required for the Electron desktop GUI.
+
+```bash
+# 1. Install Python dependencies
+pip install -r requirements.txt
+
+# 2. Make request-chain importable (adjust path to where you cloned it)
+export PYTHONPATH="/path/to/requestchain:$PYTHONPATH"
+```
+
+### Quick start — CLI (single node)
+
+```bash
+# Start a node on the default port (6000)
+python anonity/identity_peer.py
+```
+
+At the menu:
+
+1. **Select 1** — Register Identity. The node automatically solves a 20-bit proof-of-work (1–5 seconds) and mines your registration block. Starting balance: **100.0**.
+2. **Select 4** — Show My Identity & Reputation to confirm registration and view your balance.
+3. The node now runs in the background, automatically issuing and responding to reputation challenges every 2 minutes. No further action is needed to stay authenticated.
+
+### Quick start — Electron GUI (single node)
+
+```bash
+cd electron
+npm install
+npm start
+```
+
+The GUI launches a local Flask API server automatically (no separate terminal needed). Click **Register** in the sidebar to complete first-time setup.
+
+### Quick start — two-node network (CLI)
+
+```bash
+# Terminal 1 — node A on port 6000
+python anonity/identity_peer.py 6000
+
+# Terminal 2 — node B on port 6001
+python anonity/identity_peer.py 6001
+```
+
+In Terminal 2:
+- **Select 5** → enter host `localhost`, port `6000` to connect to node A.
+- **Select 7** → sync the chain from node A.
+- **Select 1** on both nodes to register identities (if not already registered).
+
+Both nodes will automatically exchange reputation challenges every 2 minutes. Balance changes propagate via `REPUTATION_MINE` and `REPUTATION_IGNORE` transactions.
+
+### Quick start — two-node network (Electron GUI)
+
+```bash
+# Window 1 — node A
+cd electron && npm start
+
+# Window 2 — node B on a different port
+cd electron && npm start -- 6001
+```
+
+In window 2, use the **Connect to Peer** button and enter `localhost:6000`.
+
+---
+
 ## Architecture
 
-The system is layered: `identity_peer.py` serves as the node entry point, wiring together an `IdentityBlockchain` (which extends the request-chain base with `IDENTITY_REGISTER`, `REPUTATION_MINE`, and `REPUTATION_IGNORE` transaction types), a `PeerChallengeManager` (which periodically selects peers to challenge and tracks pending challenges to expiry), a `ReputationRecord` store (per-identity balance and lifecycle state held in `identity/reputation.py`), and a SHA-256 PoW engine (`identity/pow.py`) used for both registration proofs and reputation challenges. The P2P layer from request-chain is reused unchanged; two new message types — `REP_CHALLENGE` and `REP_SOLUTION` — handle reputation flows on top of the existing block and transaction gossip.
+The system is layered: `anonity/identity_peer.py` serves as the CLI node entry point and `anonity/identity_api.py` serves as the Flask REST API backend (used by the Electron GUI). Both wire together an `IdentityBlockchain` (which extends the request-chain base with `IDENTITY_REGISTER`, `REPUTATION_MINE`, and `REPUTATION_IGNORE` transaction types), a `PeerChallengeManager` (which periodically selects peers to challenge and tracks pending challenges to expiry), a `ReputationRecord` store (per-identity balance and lifecycle state held in `anonity/identity/reputation.py`), and a SHA-256 PoW engine (`anonity/identity/pow.py`) used for both registration proofs and reputation challenges. The P2P layer from request-chain is reused unchanged; two new message types — `REP_CHALLENGE` and `REP_SOLUTION` — handle reputation flows on top of the existing block and transaction gossip.
 
 ---
 
@@ -169,23 +239,30 @@ target = random.choices(candidates, weights=weights, k=1)[0]
 ## File Structure
 
 ```
-requestchain-identity/
-├── identity_peer.py          # Main node entry point (CLI)
-├── identity/
+anonity/                          # repository root
+├── anonity/                      # Python package
 │   ├── __init__.py
-│   ├── identity.py           # IdentityBlockchain (extends base)
-│   ├── pow.py                # PoW engine (registration + reputation)
-│   ├── reputation.py         # ReputationRecord + ReputationEngine
-│   └── peer_challenge.py     # PeerChallengeManager
-├── blockchain/               # request-chain base (unchanged)
-│   ├── __init__.py
-│   ├── blockchain.py
-│   ├── network.py
-│   ├── security.py
-│   └── db.py
+│   ├── identity_peer.py          # CLI node entry point
+│   ├── identity_api.py           # Flask REST API backend (used by Electron GUI)
+│   └── identity/
+│       ├── __init__.py
+│       ├── identity.py           # IdentityBlockchain (extends base)
+│       ├── pow.py                # PoW engine (registration + reputation)
+│       ├── reputation.py         # ReputationRecord + ReputationEngine
+│       └── peer_challenge.py     # PeerChallengeManager
+├── electron/                     # Electron desktop GUI
+│   ├── main.js                   # Electron main process (spawns Python API)
+│   ├── preload.js                # Context bridge for renderer
+│   ├── package.json
+│   └── renderer/
+│       ├── index.html
+│       ├── app.js
+│       └── style.css
 ├── requirements.txt
 └── README.md
 ```
+
+> **Note:** The `blockchain/` base package (P2P network, block/transaction primitives) lives in the separate [request-chain](https://github.com/odds-get-evened/requestchain) repository. It must be cloned alongside this project and added to `PYTHONPATH` before running.
 
 ---
 
@@ -194,7 +271,11 @@ requestchain-identity/
 ### Prerequisites
 
 ```bash
+# Python dependencies
 pip install -r requirements.txt
+
+# The request-chain base package must be on PYTHONPATH
+export PYTHONPATH="/path/to/requestchain:$PYTHONPATH"
 ```
 
 Node.js (v18 or newer) is required only for the Electron GUI.
@@ -217,9 +298,37 @@ python anonity/identity_peer.py 6001
 2. Choose **option 1 — Register Identity**. The node solves a 20-bit proof-of-work automatically (takes 1–5 seconds) and mines a block to confirm the registration. Your starting balance is 100.0.
 3. Your node is now live. It will automatically issue and respond to reputation challenges every two minutes. Use **option 4** to watch your balance grow.
 
+### Flask API server (standalone)
+
+`anonity/identity_api.py` exposes the same node functionality over HTTP. The Electron GUI uses this automatically, but you can also run it directly for scripting or integration:
+
+```bash
+# p2p_port defaults to 6000, api_port defaults to 5001
+python anonity/identity_api.py [p2p_port [api_port]]
+
+# Example: P2P on 6001, API on 5002
+python anonity/identity_api.py 6001 5002
+```
+
+Available endpoints:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/status` | Node health & summary stats |
+| `GET` | `/api/identities` | All registered identities |
+| `GET` | `/api/my-identity` | This node's identity record |
+| `POST` | `/api/register` | Start registration PoW (async) |
+| `POST` | `/api/authenticate` | Check whether a public key passes auth |
+| `POST` | `/api/connect` | Connect to a peer `{ host, port }` |
+| `GET` | `/api/peers` | List connected peers |
+| `POST` | `/api/sync` | Request chain sync from peers |
+| `POST` | `/api/mine` | Mine pending mempool transactions (async) |
+| `POST` | `/api/challenge` | Issue a reputation challenge `{ target_pubkey }` |
+| `GET` | `/api/logs?since=N` | Return log entries from index N onwards |
+
 ### Electron desktop GUI
 
-The graphical interface controls the peer through a local REST API backend (`anonity/identity_api.py`). Electron spawns that server automatically — no manual startup needed.
+The graphical interface controls the peer through `anonity/identity_api.py`. Electron spawns that server automatically — no manual startup needed.
 
 ```bash
 cd electron
@@ -227,10 +336,13 @@ npm install
 npm start
 ```
 
-To connect two nodes, start a second instance on a different port:
+The Electron app assigns the API port as `P2P_PORT + 1000` (e.g., P2P port 6000 → API on port 7000).
+
+To start a second GUI node on a different port:
 
 ```bash
 npm start -- 6001
+# P2P: 6001, API: 7001
 ```
 
 Then use the **Connect to Peer** button and enter `localhost:6000`.
@@ -265,7 +377,7 @@ The keypair is persistent across restarts — your identity survives node restar
 ## Constants Reference
 
 ```python
-# identity/reputation.py
+# anonity/identity/reputation.py
 DEFAULT_BALANCE     = 100.0    # Starting balance for new identity
 AUTH_THRESHOLD      = 1.0      # Minimum balance to authenticate
 MINING_REWARD       = 10.0     # Balance gained per solved challenge
@@ -273,7 +385,7 @@ SOFT_DECAY_RATE     = 2.0      # Balance lost per hour (inactivity, floor=defaul
 IGNORE_PENALTY      = 15.0     # Balance lost per ignored challenge (no floor)
 DECAY_TICK_SECONDS  = 3600.0   # 1 hour decay tick
 
-# identity/pow.py
+# anonity/identity/pow.py
 REGISTRATION_DIFFICULTY_BITS = 20   # ~1M iterations
 REPUTATION_DIFFICULTY_BITS   = 14   # ~16K iterations
 ```
