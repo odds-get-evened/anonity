@@ -32,9 +32,19 @@ html, body {
 /* ── Layout shell ──────────────────────────────────────────────────────── */
 #app {
   display: grid;
-  grid-template-rows: 48px 1fr 170px;
+  grid-template-rows: 48px auto 1fr 170px;
+  grid-template-areas:
+    "header"
+    "challenge-bar"
+    "content"
+    "log";
   height: 100vh;
 }
+
+#header        { grid-area: header; }
+#challenge-bar { grid-area: challenge-bar; }
+#content       { grid-area: content; }
+#log-panel     { grid-area: log; }
 
 /* ── Header ────────────────────────────────────────────────────────────── */
 #header {
@@ -63,6 +73,8 @@ html, body {
 }
 
 .stat { display: flex; gap: 5px; }
+.stat-clickable { cursor: pointer; }
+.stat-clickable:hover .stat-value { color: var(--accent2); }
 .stat-label { color: var(--dim); }
 .stat-value { color: var(--text); }
 .stat-value.ok   { color: var(--green); }
@@ -112,6 +124,17 @@ html, body {
 .action-btn:hover  { background: var(--border); color: var(--accent2); }
 .action-btn:active { background: var(--panel); }
 
+.action-btn.has-pending {
+  color: var(--yellow);
+  background: rgba(251, 191, 36, 0.08);
+}
+.action-btn.has-pending::after {
+  content: ' ●';
+  font-size: 8px;
+  vertical-align: middle;
+}
+.action-btn.has-pending:hover { background: rgba(251, 191, 36, 0.16); }
+
 /* ── Identity table area ───────────────────────────────────────────────── */
 #main {
   display: flex;
@@ -130,11 +153,22 @@ html, body {
 }
 
 #table-wrapper {
-  flex: 1;
+  flex: 1 1 0;
+  min-height: 60px;
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
+}
+
+#challenges-wrapper {
+  flex: 0 0 auto;
+  max-height: 150px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin-bottom: 10px;
 }
 
 table {
@@ -381,6 +415,10 @@ td:not(:first-child) { text-align: right; }
 #challenge-bar.solved {
   border-bottom-color: #4caf50;
   background: linear-gradient(90deg, #1a3a22, #163020);
+}
+#challenge-bar.expired {
+  border-bottom-color: var(--red);
+  background: linear-gradient(90deg, #3a1a1a, #2a1010);
 }
 #challenge-bar-icon {
   font-size: 16px;

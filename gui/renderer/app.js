@@ -75,8 +75,10 @@ function toast (msg, duration = 3000) {
 function startRefreshLoop () {
   refreshStatus()
   refreshIdentities()
-  setInterval(refreshStatus,     2000)
-  setInterval(refreshIdentities, 5000)
+  refreshIssuedChallenges()
+  setInterval(refreshStatus,           2000)
+  setInterval(refreshIdentities,       5000)
+  setInterval(refreshIssuedChallenges, 3000)
 }
 
 async function refreshStatus () {
@@ -86,9 +88,20 @@ async function refreshStatus () {
 
     ownPubkey = s.pubkey || ''
 
-    set('stat-pubkey',    abbrev(s.pubkey, 16))
-    set('stat-blocks',    s.blocks)
-    set('stat-mempool',   s.mempool)
+    set('stat-pubkey',  abbrev(s.pubkey, 16))
+    set('stat-blocks',  s.blocks)
+    set('stat-mempool', s.mempool)
+
+    const mineBtn = document.getElementById('btn-mine')
+    if (s.mempool > 0) mineBtn.classList.add('has-pending')
+    else               mineBtn.classList.remove('has-pending')
+
+    const authEl = document.getElementById('stat-auth')
+    if (authEl) {
+      const rev = s.rev_count ?? 0
+      authEl.textContent = rev > 0 ? `${s.auth_count ?? '—'}/${rev}r` : (s.auth_count ?? '—')
+      authEl.className   = 'stat-value ' + (rev > 0 ? 'warn' : 'ok')
+    }
 
     const balEl = document.getElementById('stat-balance')
     balEl.textContent = s.balance !== null ? s.balance.toFixed(1) : '—'
@@ -125,6 +138,26 @@ async function refreshIdentities () {
         <td>${r.solved}</td>
         <td>${r.ignored}</td>
         <td class="${sClass}">${sText}</td>
+      </tr>`
+    }).join('')
+  } catch (_) {}
+}
+
+async function refreshIssuedChallenges () {
+  try {
+    const challenges = await fetchJSON('/api/issued-challenges')
+    const tbody = document.getElementById('challenges-tbody')
+    if (!challenges.length) {
+      tbody.innerHTML = '<tr><td class="empty-cell" colspan="3">No pending challenges</td></tr>'
+      return
+    }
+    tbody.innerHTML = challenges.map(c => {
+      const issued  = new Date(c.issued_at  * 1000).toLocaleTimeString()
+      const expires = new Date(c.expires_at * 1000).toLocaleTimeString()
+      return `<tr>
+        <td class="td-pubkey">${abbrev(c.target_pubkey, 28)}</td>
+        <td style="text-align:right;font-family:var(--mono);font-size:11px;color:var(--muted)">${issued}</td>
+        <td style="text-align:right;font-family:var(--mono);font-size:11px;color:var(--muted)">${expires}</td>
       </tr>`
     }).join('')
   } catch (_) {}
@@ -172,11 +205,11 @@ let _challengeBarTimer = null
 function showChallengeBar (msg, state = 'solving') {
   const bar  = document.getElementById('challenge-bar')
   const icon = document.getElementById('challenge-bar-icon')
-  bar.className = state          // 'solving' | 'solved'
-  icon.textContent = state === 'solved' ? '✓' : '⚡'
+  bar.className = state          // 'solving' | 'solved' | 'expired'
+  icon.textContent = state === 'solved' ? '✓' : state === 'expired' ? '✗' : '⚡'
   document.getElementById('challenge-bar-msg').textContent = msg
   clearTimeout(_challengeBarTimer)
-  if (state === 'solved') {
+  if (state === 'solved' || state === 'expired') {
     _challengeBarTimer = setTimeout(hideChallengeBar, 6000)
   }
 }
@@ -197,6 +230,11 @@ async function pollIncomingChallenges () {
           )
         } else if (ev.kind === 'solved') {
           showChallengeBar('Challenge solved! Reputation transaction broadcast to network.', 'solved')
+        } else if (ev.kind === 'expired') {
+          showChallengeBar(
+            `Challenge expired — ${abbrev(ev.target_pubkey, 20)} did not respond. Ignore penalty submitted.`,
+            'expired',
+          )
         }
       }
       incomingChallengeCursor = data.next
@@ -448,6 +486,23 @@ document.getElementById('btn-challenge').addEventListener('click', async () => {
     item.classList.add('selected')
     selectedPubkey = item.dataset.pubkey
   })
+})
+
+// ── Mempool inspector ──────────────────────────────────────────────────────
+
+const TX_TYPE_NAMES = { 10: 'IDENTITY_REGISTER', 11: 'REPUTATION_MINE', 12: 'REPUTATION_IGNORE' }
+
+document.getElementById('mempool-stat').addEventListener('click', async () => {
+  try {
+    const txs = await fetchJSON('/api/mempool')
+    if (!txs.length) { infoModal('Mempool', 'No pending transactions'); return }
+    const lines = txs.map(tx => {
+      const typeName = TX_TYPE_NAMES[tx.type] || `type=${tx.type}`
+      const ts = tx.timestamp ? new Date(tx.timestamp * 1000).toLocaleTimeString() : '?'
+      return `[${ts}] ${typeName}\n  from: ${abbrev(tx.requester, 40)}\n  uid:  ${abbrev(tx.uid, 40)}`
+    })
+    infoModal(`Mempool — ${txs.length} pending tx(s)`, lines.join('\n\n'))
+  } catch (e) { toast('Error: ' + e.message) }
 })
 
 // ── Start ──────────────────────────────────────────────────────────────────
