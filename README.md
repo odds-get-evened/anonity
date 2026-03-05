@@ -4,6 +4,20 @@ A pseudonymous, reputation-based identity management system built on a custom bl
 
 ---
 
+## API Documentation
+
+Full endpoint reference is in [`docs/`](./docs/README.md):
+
+| Section | Endpoints |
+|---|---|
+| Status & Monitoring | [`/api/status`](./docs/endpoints/status.md), [`/api/logs`](./docs/endpoints/logs.md) |
+| Identity | [`/api/identities`](./docs/endpoints/identities.md), [`/api/my-identity`](./docs/endpoints/my-identity.md), [`/api/register`](./docs/endpoints/register.md), [`/api/authenticate`](./docs/endpoints/authenticate.md) |
+| Peers | [`/api/connect`](./docs/endpoints/connect.md), [`/api/peers`](./docs/endpoints/peers.md) |
+| Blockchain | [`/api/sync`](./docs/endpoints/sync.md), [`/api/mine`](./docs/endpoints/mine.md), [`/api/mempool`](./docs/endpoints/mempool.md) |
+| Challenges | [`/api/challenge`](./docs/endpoints/challenge.md), [`/api/issued-challenges`](./docs/endpoints/issued-challenges.md), [`/api/incoming-challenges`](./docs/endpoints/incoming-challenges.md) |
+
+---
+
 ## Getting Started
 
 ### Prerequisites
