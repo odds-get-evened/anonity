@@ -29,6 +29,7 @@ Usage:
 
 import atexit
 import json
+import os
 import sys
 import threading
 import time
@@ -78,6 +79,7 @@ def save_keypair(priv_key: ec.EllipticCurvePrivateKey, p: Path):
     pem = priv_key.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption())
     with open(p, 'wb') as fh:
         fh.write(pem)
+    os.chmod(p, 0o600)  # restrict to owner-only read/write
 
 
 def load_keypair(p: Path) -> ec.EllipticCurvePrivateKey | None:
@@ -97,12 +99,15 @@ def load_keypair(p: Path) -> ec.EllipticCurvePrivateKey | None:
 
 _log_buffer: list[dict] = []
 _log_lock = threading.Lock()
+_MAX_LOG_ENTRIES = 10_000
 
 
 def log(msg: str):
     ts = time.strftime("%H:%M:%S")
     with _log_lock:
         _log_buffer.append({"ts": ts, "msg": msg})
+        if len(_log_buffer) > _MAX_LOG_ENTRIES:
+            del _log_buffer[:-_MAX_LOG_ENTRIES]
 
 
 # ---------------------------------------------------------------------------
@@ -111,11 +116,14 @@ def log(msg: str):
 
 _challenge_events: list[dict] = []
 _challenge_events_lock = threading.Lock()
+_MAX_CHALLENGE_EVENTS = 1_000
 
 
 def _add_challenge_event(event: dict):
     with _challenge_events_lock:
         _challenge_events.append(event)
+        if len(_challenge_events) > _MAX_CHALLENGE_EVENTS:
+            del _challenge_events[:-_MAX_CHALLENGE_EVENTS]
 
 
 # ---------------------------------------------------------------------------
@@ -131,6 +139,9 @@ state: dict = {
     'challenge_manager': None,
 }
 
+_registration_lock = threading.Lock()
+_mining_lock = threading.Lock()
+
 
 # ---------------------------------------------------------------------------
 # Flask app
@@ -139,9 +150,16 @@ state: dict = {
 app = Flask(__name__)
 
 
+_ALLOWED_ORIGINS = {'null', 'file://'}
+
+
 @app.after_request
 def _cors(response):
-    response.headers['Access-Control-Allow-Origin']  = '*'
+    origin = request.headers.get('Origin', '')
+    # Allow Electron (file:// → 'null') and direct localhost access.
+    # Reject wildcard to prevent arbitrary web pages from calling the local API.
+    if origin in _ALLOWED_ORIGINS or origin.startswith('http://127.0.0.1'):
+        response.headers['Access-Control-Allow-Origin'] = origin
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
     return response
@@ -244,6 +262,9 @@ def api_register():
         if record and record.balance != DEFAULT_BALANCE:
             return jsonify({'already_registered': True, 'balance': record.balance})
 
+    if not _registration_lock.acquire(blocking=False):
+        return jsonify({'error': 'Registration already in progress'}), 409
+
     def _do_register():
         try:
             log(f"Solving registration PoW ({REGISTRATION_DIFFICULTY_BITS}-bit)…")
@@ -268,6 +289,8 @@ def api_register():
             chain.snapshot_identity(SNAP_PATH)
         except Exception as e:
             log(f"Registration error: {e}")
+        finally:
+            _registration_lock.release()
 
     threading.Thread(target=_do_register, daemon=True).start()
     return jsonify({'started': True})
@@ -285,9 +308,12 @@ def api_authenticate():
         return jsonify({'error': 'Not initialised'}), 503
 
     data    = request.get_json(silent=True) or {}
-    key_hex = data.get('pubkey', '').strip()
+    key_hex = data.get('pubkey', '').strip().lower()
+    # Compressed SECP256R1 public key: 33 bytes = 66 hex chars, starts with 02 or 03
     if not key_hex:
         return jsonify({'error': 'pubkey required'}), 400
+    if len(key_hex) != 66 or not all(c in '0123456789abcdef' for c in key_hex):
+        return jsonify({'error': 'pubkey must be a 66-character hex string (compressed EC public key)'}), 400
 
     result = chain.authenticate(key_hex)
     record = chain.get_identity(key_hex)
@@ -317,8 +343,16 @@ def api_connect():
         return jsonify({'error': 'host and port required'}), 400
 
     try:
-        p2p.connect_to_peer(host, int(port))
-        log(f"Connecting to {host}:{port}…")
+        port_int = int(port)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'port must be an integer'}), 400
+
+    if not 1 <= port_int <= 65535:
+        return jsonify({'error': 'port must be between 1 and 65535'}), 400
+
+    try:
+        p2p.connect_to_peer(host, port_int)
+        log(f"Connecting to {host}:{port_int}…")
         return jsonify({'ok': True})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -364,6 +398,9 @@ def api_mine():
     if not chain.mempool:
         return jsonify({'error': 'Mempool is empty'}), 400
 
+    if not _mining_lock.acquire(blocking=False):
+        return jsonify({'error': 'Mining already in progress'}), 409
+
     def _do_mine():
         try:
             log(f"Mining {len(chain.mempool)} pending transaction(s)…")
@@ -376,6 +413,8 @@ def api_mine():
                 log("Mining failed")
         except Exception as e:
             log(f"Mining error: {e}")
+        finally:
+            _mining_lock.release()
 
     threading.Thread(target=_do_mine, daemon=True).start()
     return jsonify({'started': True})
@@ -420,7 +459,7 @@ def api_challenge():
 def api_logs():
     """Return log entries from index `since` onwards (for polling)."""
     try:
-        since = int(request.args.get('since', 0))
+        since = max(0, int(request.args.get('since', 0)))
     except ValueError:
         since = 0
 
@@ -437,7 +476,7 @@ def api_logs():
 def api_incoming_challenges():
     """Return incoming-challenge events from index `since` onwards."""
     try:
-        since = int(request.args.get('since', 0))
+        since = max(0, int(request.args.get('since', 0)))
     except ValueError:
         since = 0
 

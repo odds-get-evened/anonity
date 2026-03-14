@@ -133,7 +133,7 @@ async function refreshIdentities () {
       const sClass   = r.authenticated ? 'td-status-auth' : 'td-status-revoked'
       const sText    = r.authenticated ? 'AUTH' : 'REVOKED'
       return `<tr${rowClass}>
-        <td class="td-pubkey">${abbrev(r.pubkey, 36)}${isOwn ? ' <span style="color:var(--accent);font-size:10px">(me)</span>' : ''}</td>
+        <td class="td-pubkey">${escHtml(abbrev(r.pubkey, 36))}${isOwn ? ' <span style="color:var(--accent);font-size:10px">(me)</span>' : ''}</td>
         <td class="td-balance">${r.balance.toFixed(1)}</td>
         <td>${r.solved}</td>
         <td>${r.ignored}</td>
@@ -155,9 +155,9 @@ async function refreshIssuedChallenges () {
       const issued  = new Date(c.issued_at  * 1000).toLocaleTimeString()
       const expires = new Date(c.expires_at * 1000).toLocaleTimeString()
       return `<tr>
-        <td class="td-pubkey">${abbrev(c.target_pubkey, 28)}</td>
-        <td style="text-align:right;font-family:var(--mono);font-size:11px;color:var(--muted)">${issued}</td>
-        <td style="text-align:right;font-family:var(--mono);font-size:11px;color:var(--muted)">${expires}</td>
+        <td class="td-pubkey">${escHtml(abbrev(c.target_pubkey, 28))}</td>
+        <td style="text-align:right;font-family:var(--mono);font-size:11px;color:var(--muted)">${escHtml(issued)}</td>
+        <td style="text-align:right;font-family:var(--mono);font-size:11px;color:var(--muted)">${escHtml(expires)}</td>
       </tr>`
     }).join('')
   } catch (_) {}
@@ -447,7 +447,7 @@ document.getElementById('btn-challenge').addEventListener('click', async () => {
       ${candidates.map((r, i) => {
         const isSelf = r.pubkey === ownPubkey
         return `<div class="modal-list-item" data-i="${i}" data-pubkey="${escHtml(r.pubkey)}">
-          ${abbrev(r.pubkey, 38)} &nbsp;<span style="color:var(--muted)">bal=${r.balance.toFixed(1)}</span>${isSelf ? ' <span style="color:var(--accent);font-size:10px">(self)</span>' : ''}
+          ${escHtml(abbrev(r.pubkey, 38))} &nbsp;<span style="color:var(--muted)">bal=${r.balance.toFixed(1)}</span>${isSelf ? ' <span style="color:var(--accent);font-size:10px">(self)</span>' : ''}
         </div>`
       }).join('')}
     </div>`

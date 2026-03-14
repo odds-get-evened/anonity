@@ -31,6 +31,7 @@ New P2P message types added:
 
 import atexit
 import json
+import os
 import signal
 import sys
 import threading
@@ -86,6 +87,7 @@ def save_keypair(priv_key: ec.EllipticCurvePrivateKey, p: Path):
     pem = priv_key.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption())
     with open(p, 'wb') as fh:
         fh.write(pem)
+    os.chmod(p, 0o600)  # restrict to owner-only read/write
 
 
 def load_keypair(p: Path) -> ec.EllipticCurvePrivateKey | None:
