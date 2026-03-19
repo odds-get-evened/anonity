@@ -1,6 +1,6 @@
 # Anonymous Identity Authenticator
 
-A pseudonymous, reputation-based identity management system built on a custom blockchain. Identities are anchored to EC public keys (equivalent to PGP public keys), reputation is earned by solving proof-of-work challenges, and authentication is gated by a wallet balance that can grow, decay, or be revoked.
+A reputation-based identity management system built on a custom blockchain. Identities are anchored to EC public keys (equivalent to PGP public keys), reputation is earned by solving proof-of-work challenges, and authentication is gated by a wallet balance that can grow, decay, or be revoked.
 
 ---
 
